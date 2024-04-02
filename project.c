@@ -8,7 +8,7 @@
 #include <fcntl.h>
 #include <time.h>
 
-void listFilesRecursively(const char *basePath, FILE *snapshotFile) {
+void listFilesRecursively(const char *basePath, int snapshotFile) {
     char path[1000];
     struct dirent *entry;
     struct stat statbuf;
@@ -31,12 +31,28 @@ void listFilesRecursively(const char *basePath, FILE *snapshotFile) {
         }
 
         if (S_ISDIR(statbuf.st_mode)) {
-            fprintf(snapshotFile, "Directory: %s\n", path);
-            printf("Directory: %s\n", path);
-            listFilesRecursively(path, snapshotFile);
+            char buffer[1024];
+            int len = snprintf(buffer, sizeof(buffer), "Directory: %s\n", path);
+            if (write(snapshotFile, buffer, len) != len) {
+                perror("write");
+                exit(EXIT_FAILURE);
+            }
+            if (write(STDOUT_FILENO, buffer, len) != len) {
+                perror("write");
+                exit(EXIT_FAILURE);
+            }
+            listFilesRecursively(path, snapshotFile); // Recursively list contents of subdirectories
         } else {
-            fprintf(snapshotFile, "File: %s\n", path);
-            printf("File: %s\n", path);
+            char buffer[1024];
+            int len = snprintf(buffer, sizeof(buffer), "File: %s\n", path);
+            if (write(snapshotFile, buffer, len) != len) {
+                perror("write");
+                exit(EXIT_FAILURE);
+            }
+            if (write(STDOUT_FILENO, buffer, len) != len) {
+                perror("write");
+                exit(EXIT_FAILURE);
+            }
         }
     }
 
@@ -49,15 +65,15 @@ void createSnapshot(const char *basePath) {
     char filename[100];
     sprintf(filename, "snapshot_%d-%02d-%02d_%02d-%02d-%02d.txt", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
 
-    FILE *snapshotFile = fopen(filename, "w");
-    if (!snapshotFile) {
-        perror("fopen");
+    int snapshotFile = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (snapshotFile == -1) {
+        perror("open");
         exit(EXIT_FAILURE);
     }
 
     listFilesRecursively(basePath, snapshotFile);
 
-    fclose(snapshotFile);
+    close(snapshotFile);
     printf("Snapshot created: %s\n", filename);
 }
 
