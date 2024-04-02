@@ -8,7 +8,7 @@
 #include <fcntl.h>
 #include <time.h>
 
-void listFilesRecursively(const char *basePath) {
+void listFilesRecursively(const char *basePath, FILE *snapshotFile) {
     char path[1000];
     struct dirent *entry;
     struct stat statbuf;
@@ -31,14 +31,34 @@ void listFilesRecursively(const char *basePath) {
         }
 
         if (S_ISDIR(statbuf.st_mode)) {
+            fprintf(snapshotFile, "Directory: %s\n", path);
             printf("Directory: %s\n", path);
-            listFilesRecursively(path);
+            listFilesRecursively(path, snapshotFile);
         } else {
+            fprintf(snapshotFile, "File: %s\n", path);
             printf("File: %s\n", path);
         }
     }
 
     closedir(dir);
+}
+
+void createSnapshot(const char *basePath) {
+    time_t t = time(NULL);
+    struct tm tm = *localtime(&t);
+    char filename[100];
+    sprintf(filename, "snapshot_%d-%02d-%02d_%02d-%02d-%02d.txt", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+
+    FILE *snapshotFile = fopen(filename, "w");
+    if (!snapshotFile) {
+        perror("fopen");
+        exit(EXIT_FAILURE);
+    }
+
+    listFilesRecursively(basePath, snapshotFile);
+
+    fclose(snapshotFile);
+    printf("Snapshot created: %s\n", filename);
 }
 
 int main(int argc, char *argv[]) {
@@ -47,7 +67,7 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    listFilesRecursively(argv[1]);
+    createSnapshot(argv[1]);
 
     return EXIT_SUCCESS;
 }
