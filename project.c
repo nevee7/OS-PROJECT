@@ -62,8 +62,8 @@ void listFilesRecursively(const char *basePath, int snapshotFile) {
 void createSnapshot(const char *basePath) {
     time_t t = time(NULL);
     struct tm tm = *localtime(&t);
-    char filename[100];
-    sprintf(filename, "snapshot_%d-%02d-%02d_%02d-%02d-%02d.txt", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+    char filename[1000];
+    sprintf(filename, "%s/snapshot_%d-%02d-%02d_%02d-%02d-%02d.txt", basePath, tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
 
     int snapshotFile = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (snapshotFile == -1) {
@@ -78,12 +78,14 @@ void createSnapshot(const char *basePath) {
 }
 
 int main(int argc, char *argv[]) {
-    if (argc != 2) {
+    if (argc < 2) {
         write(STDERR_FILENO, "Usage: <directory_path>\n", strlen("Usage: <directory_path>\n"));
         exit(EXIT_FAILURE);
     }
-
-    createSnapshot(argv[1]);
+    for( int i = 1 ; i < argc ; i ++){
+        char *path = argv[i];
+        createSnapshot(path);
+    }
 
     return EXIT_SUCCESS;
 }
