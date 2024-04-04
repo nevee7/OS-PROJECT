@@ -8,8 +8,6 @@ The user can specify the directory to be monitored as an argument in the command
 With each run of the program, the snapshot of the directory will be updated, storing the metadata of each entry.
 
 
-
-
 -----The second part of the project----
 
 The functionality of the program will be updated to allow it to receive an unspecified number of arguments (directories) in the command line. The logic for capturing metadata will now apply to all received arguments, meaning the program will update snapshots for all directories specified by the user.
