@@ -79,7 +79,7 @@ void updateSnapshot(const char *basePath) {
     snprintf(newSnapshot, sizeof(newSnapshot), "%s/snapshot_%d-%02d-%02d_%02d-%02d-%02d.txt", basePath, tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
 
     char oldSnapshot[MAX_PATH_LENGTH];
-    snprintf(oldSnapshot, sizeof(oldSnapshot), "%s/previous_snapshot.txt", basePath);
+    snprintf(oldSnapshot, sizeof(oldSnapshot), "%s/new_snapshot.txt", basePath);
 
     if (rename(newSnapshot, oldSnapshot) != 0) {
         perror("rename");
