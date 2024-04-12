@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <time.h>
+#include <getopt.h>
 
 #define MAX_PATH_LENGTH 1000
 
@@ -53,11 +54,11 @@ void listFilesRecursively(const char *basePath, int snapshotFile) {
     closedir(dir);
 }
 
-void createSnapshot(const char *basePath) {
+void createSnapshot(const char *basePath, const char *outputDir) {
     time_t t = time(NULL);
     struct tm tm = *localtime(&t);
     char filename[MAX_PATH_LENGTH];
-    sprintf(filename, "%s/snapshot_%d-%02d-%02d_%02d-%02d-%02d.txt", basePath, tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+    sprintf(filename, "%s/snapshot_%d-%02d-%02d_%02d-%02d-%02d.txt", outputDir, tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
 
     int snapshotFile = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (snapshotFile == -1) {
@@ -71,15 +72,15 @@ void createSnapshot(const char *basePath) {
     printf("Snapshot created: %s\n", filename);
 }
 
-void updateSnapshot(const char *basePath) {
+void updateSnapshot(const char *basePath, const char *outputDir) {
     char newSnapshot[MAX_PATH_LENGTH];
-    createSnapshot(basePath);
+    createSnapshot(basePath, outputDir);
     time_t t = time(NULL);
     struct tm tm = *localtime(&t);
-    snprintf(newSnapshot, sizeof(newSnapshot), "%s/snapshot_%d-%02d-%02d_%02d-%02d-%02d.txt", basePath, tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+    snprintf(newSnapshot, sizeof(newSnapshot), "%s/snapshot_%d-%02d-%02d_%02d-%02d-%02d.txt", outputDir, tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
 
     char oldSnapshot[MAX_PATH_LENGTH];
-    snprintf(oldSnapshot, sizeof(oldSnapshot), "%s/new_snapshot.txt", basePath);
+    snprintf(oldSnapshot, sizeof(oldSnapshot), "%s/new_snapshot.txt", outputDir);
 
     if (rename(newSnapshot, oldSnapshot) != 0) {
         perror("rename");
@@ -89,14 +90,33 @@ void updateSnapshot(const char *basePath) {
 }
 
 int main(int argc, char *argv[]) {
-    if (argc < 2) {
-        write(STDERR_FILENO, "Usage: <directory_path>\n", strlen("Usage: <directory_path>\n"));
+    if (argc < 3) {
+        write(STDERR_FILENO, "Usage: ./program_exe -o <output_directory> <directory_path1> <directory_path2> ...\n", strlen("Usage: ./program_exe -o <output_directory> <directory_path1> <directory_path2> ...\n"));
         exit(EXIT_FAILURE);
     }
 
-    for (int i = 1; i < argc; i++) {
+    int opt;
+    char *outputDir = NULL;
+
+    while ((opt = getopt(argc, argv, "o:")) != -1) {
+        switch (opt) {
+            case 'o':
+                outputDir = optarg;
+                break;
+            default:
+                write(STDERR_FILENO, "Usage: ./program_exe -o <output_directory> <directory_path1> <directory_path2> ...\n", strlen("Usage: ./program_exe -o <output_directory> <directory_path1> <directory_path2> ...\n"));
+                exit(EXIT_FAILURE);
+        }
+    }
+
+    if (outputDir == NULL) {
+        write(STDERR_FILENO, "Output directory not specified.\n", strlen("Output directory not specified.\n"));
+        exit(EXIT_FAILURE);
+    }
+
+    for (int i = optind; i < argc; i++) {
         char *path = argv[i];
-        updateSnapshot(path);
+        updateSnapshot(path, outputDir);
     }
 
     return EXIT_SUCCESS;
