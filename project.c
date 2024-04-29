@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <time.h>
 #include <getopt.h>
+#include <sys/wait.h>
 
 #define MAX_PATH_LENGTH 1000
 
@@ -73,20 +74,24 @@ void createSnapshot(const char *basePath, const char *outputDir) {
 }
 
 void updateSnapshot(const char *basePath, const char *outputDir) {
-    char newSnapshot[MAX_PATH_LENGTH];
-    createSnapshot(basePath, outputDir);
-    time_t t = time(NULL);
-    struct tm tm = *localtime(&t);
-    snprintf(newSnapshot, sizeof(newSnapshot), "%s/snapshot_%d-%02d-%02d_%02d-%02d-%02d.txt", outputDir, tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
-
-    char oldSnapshot[MAX_PATH_LENGTH];
-    snprintf(oldSnapshot, sizeof(oldSnapshot), "%s/new_snapshot.txt", outputDir);
-
-    if (rename(newSnapshot, oldSnapshot) != 0) {
-        perror("rename");
+    pid_t pid = fork(); // Fork a child process
+    if (pid == -1) {
+        perror("fork");
         exit(EXIT_FAILURE);
+    } else if (pid == 0) { // Child process
+        createSnapshot(basePath, outputDir);
+        exit(EXIT_SUCCESS);
+    } else { // Parent process
+        // Wait for the child process to terminate
+        int status;
+        waitpid(pid, &status, 0);
+
+        if (WIFEXITED(status)) {
+            printf("Child Process %d terminated with PID %d and exit code %d.\n", getpid(), pid, WEXITSTATUS(status));
+        } else {
+            printf("Child Process %d terminated abnormally.\n", pid);
+        }
     }
-    printf("Snapshot updated.\n");
 }
 
 int main(int argc, char *argv[]) {
