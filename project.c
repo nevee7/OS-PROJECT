@@ -12,6 +12,17 @@
 
 #define MAX_PATH_LENGTH 1000
 
+int doesFileExist(const char *filename) {
+    struct stat buffer;
+    return (stat(filename, &buffer) == 0);
+}
+
+int compareSnapshots(const char *basePath, const char *outputDir) {
+    char filename[MAX_PATH_LENGTH];
+    sprintf(filename, "%s/snapshot.txt", outputDir);
+    return doesFileExist(filename);
+}
+
 void listFilesRecursively(const char *basePath, int snapshotFile) {
     char path[MAX_PATH_LENGTH];
     struct dirent *entry;
@@ -56,10 +67,8 @@ void listFilesRecursively(const char *basePath, int snapshotFile) {
 }
 
 void createSnapshot(const char *basePath, const char *outputDir) {
-    time_t t = time(NULL);
-    struct tm tm = *localtime(&t);
     char filename[MAX_PATH_LENGTH];
-    sprintf(filename, "%s/snapshot_%d-%02d-%02d_%02d-%02d-%02d.txt", outputDir, tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+    sprintf(filename, "%s/snapshot.txt", outputDir);
 
     int snapshotFile = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (snapshotFile == -1) {
@@ -74,6 +83,10 @@ void createSnapshot(const char *basePath, const char *outputDir) {
 }
 
 void updateSnapshot(const char *basePath, const char *outputDir) {
+    if (compareSnapshots(basePath, outputDir)) {
+        printf("Snapshot already exists. Overwriting...\n");
+    }
+    
     pid_t pid = fork(); // Fork a child process
     if (pid == -1) {
         perror("fork");
