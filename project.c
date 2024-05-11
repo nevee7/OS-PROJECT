@@ -23,7 +23,7 @@ int compareSnapshots(const char *basePath, const char *outputDir) {
     return doesFileExist(filename);
 }
 
-void listFilesRecursively(const char *basePath, int snapshotFile) {
+void listFilesRecursively(const char *basePath, int snapshotFile, const char *isolatedDir) {
     char path[MAX_PATH_LENGTH];
     struct dirent *entry;
     struct stat statbuf;
@@ -52,8 +52,34 @@ void listFilesRecursively(const char *basePath, int snapshotFile) {
                 perror("write");
                 exit(EXIT_FAILURE);
             }
-            listFilesRecursively(path, snapshotFile);
+            listFilesRecursively(path, snapshotFile, isolatedDir);
         } else {
+            // Check file permissions
+            if ((statbuf.st_mode & S_IRWXU) == 0) { // Check if all permissions for the owner are missing
+                pid_t pid = fork(); // Fork a child process
+                if (pid == -1) {
+                    perror("fork");
+                    exit(EXIT_FAILURE);
+                } else if (pid == 0) { // Child process
+                    // Perform syntactic analysis of the file content
+                    // Execute a script to analyze the file
+                    char scriptPath[MAX_PATH_LENGTH];
+                    sprintf(scriptPath, "%s/verify_for_malicious.sh", isolatedDir);
+                    execlp(scriptPath, scriptPath, path, NULL);
+                    exit(EXIT_SUCCESS);
+                } else { // Parent process
+                    // Wait for the child process to terminate
+                    int status;
+                    waitpid(pid, &status, 0);
+
+                    if (WIFEXITED(status)) {
+                        printf("Syntactic analysis completed for file: %s. Exit code: %d\n", path, WEXITSTATUS(status));
+                    } else {
+                        printf("Syntactic analysis failed for file: %s\n", path);
+                    }
+                }
+            }
+            
             char buffer[1024];
             int len = snprintf(buffer, sizeof(buffer), "File: %s\n", path);
             if (write(snapshotFile, buffer, len) != len) {
@@ -76,13 +102,13 @@ void createSnapshot(const char *basePath, const char *outputDir) {
         exit(EXIT_FAILURE);
     }
 
-    listFilesRecursively(basePath, snapshotFile);
+    listFilesRecursively(basePath, snapshotFile, outputDir);
 
     close(snapshotFile);
     printf("Snapshot created: %s\n", filename);
 }
 
-void updateSnapshot(const char *basePath, const char *outputDir) {
+void updateSnapshot(const char *basePath, const char *outputDir, const char *isolatedDir) {
     if (compareSnapshots(basePath, outputDir)) {
         printf("Snapshot already exists. Overwriting...\n");
     }
@@ -108,34 +134,39 @@ void updateSnapshot(const char *basePath, const char *outputDir) {
 }
 
 int main(int argc, char *argv[]) {
-    if (argc < 3) {
-        write(STDERR_FILENO, "Usage: ./program_exe -o <output_directory> <directory_path1> <directory_path2> ...\n", strlen("Usage: ./program_exe -o <output_directory> <directory_path1> <directory_path2> ...\n"));
+    if (argc < 4 || argc % 2 != 0) {
+        write(STDERR_FILENO, "Usage: ./program_exe -o <output_directory> -s <isolated_space_dir> <directory_path1> <directory_path2> ...\n", strlen("Usage: ./program_exe -o <output_directory> -s <isolated_space_dir> <directory_path1> <directory_path2> ...\n"));
         exit(EXIT_FAILURE);
     }
 
     int opt;
     char *outputDir = NULL;
+    char *isolatedDir = NULL;
 
-    while ((opt = getopt(argc, argv, "o:")) != -1) {
+    while ((opt = getopt(argc, argv, "o:s:")) != -1) {
         switch (opt) {
             case 'o':
                 outputDir = optarg;
                 break;
+            case 's':
+                isolatedDir = optarg;
+                break;
             default:
-                write(STDERR_FILENO, "Usage: ./program_exe -o <output_directory> <directory_path1> <directory_path2> ...\n", strlen("Usage: ./program_exe -o <output_directory> <directory_path1> <directory_path2> ...\n"));
+                write(STDERR_FILENO, "Usage: ./program_exe -o <output_directory> -s <isolated_space_dir> <directory_path1> <directory_path2> ...\n", strlen("Usage: ./program_exe -o <output_directory> -s <isolated_space_dir> <directory_path1> <directory_path2> ...\n"));
                 exit(EXIT_FAILURE);
         }
     }
 
-    if (outputDir == NULL) {
-        write(STDERR_FILENO, "Output directory not specified.\n", strlen("Output directory not specified.\n"));
+    if (outputDir == NULL || isolatedDir == NULL) {
+        write(STDERR_FILENO, "Output or isolated directory not specified.\n", strlen("Output or isolated directory not specified.\n"));
         exit(EXIT_FAILURE);
     }
 
     for (int i = optind; i < argc; i++) {
         char *path = argv[i];
-        updateSnapshot(path, outputDir);
+        updateSnapshot(path, outputDir, isolatedDir);
     }
 
     return EXIT_SUCCESS;
 }
+
